@@ -1,0 +1,169 @@
+--[[--------------INFO-----------------
+	CREATORS : 		 pageotkillian1
+	CREATION DATE : 	1/04/2024
+	LAST EDIT DATE :	3/04/2024
+	DETAILS :		More Auto-completaion
+--]]------------VARIABLES--------------
+
+local ScriptEditorService = game:GetService("ScriptEditorService")
+
+local DataStoreSave = {}
+local OffsetY = 50
+
+local interface = plugin:CreateDockWidgetPluginGui(
+	"widget",
+	DockWidgetPluginGuiInfo.new(
+		Enum.InitialDockState.Float,
+		false,
+		true,
+		200,
+		80,
+		20,
+		20
+	)
+)
+interface.Title = "More Auto-completaion"
+interface.Name = "MoreAuto-completaion"
+
+local menu: Frame = script.Parent.Frame
+
+------------FUNCTIONS--------------
+
+function toolActivated()
+	interface.Enabled = not interface.Enabled
+end
+
+function CreateCompletation(Text: string)
+	if Text == "" or Text == nil then warn("You need to put text") return end
+	
+	type Request = {
+		position: {
+			line: number,
+			character: number,
+		},
+		textDocument: {
+			document: ScriptDocument?,
+			script: LuaSourceContainer?,
+		},
+	}
+
+	type Response = {
+		items: {
+			{
+				label: string,
+				kind: Enum.CompletionItemKind?,
+				tags: { Enum.CompletionItemTag }?,
+				detail: string?,
+				documentation: {
+					value: string,
+				}?,
+				overloads: number?,
+				learnMoreLink: string?,
+				codeSample: string?,
+				preselect: boolean?,
+				textEdit: {
+					newText: string,
+					replace: {
+						start: { line: number, character: number },
+						["end"]: { line: number, character: number },
+					},
+				}?,
+			}
+		},
+	}
+
+	local autocompleteCallback = function(request: Request, response: Response): Response
+		local item = {
+			label = Text,
+			preselect = false,
+			tags = Enum.CompletionItemTag.PluginPermissions,
+			kind = Enum.CompletionItemKind.Variable,
+			detail = "Custom",
+		} 
+		table.insert(response.items, item)
+		return response
+	end
+
+	pcall(function()
+		ScriptEditorService:RegisterAutocompleteCallback(Text, 1, autocompleteCallback)
+	end)
+	
+	table.insert(DataStoreSave, Text)
+	plugin:SetSetting("SaveCompletation", DataStoreSave)
+	
+	local CloneText = menu.CompleationText:Clone()
+	CloneText.Parent = menu.ScrollingFrame
+	CloneText.Text = Text
+	CloneText.Visible = true
+	CloneText.Position += UDim2.fromOffset(0, OffsetY)
+	OffsetY += 50
+	
+	CloneText.RemoveButton.MouseButton1Click:Connect(function()
+
+		CloneText:Destroy()
+		DataStoreSave[CloneText.Text] = nil
+		OffsetY -= 50
+		ScriptEditorService:DeregisterAutocompleteCallback(CloneText.Text)
+		plugin:SetSetting("SaveCompletation", DataStoreSave)
+
+	end)
+	
+end
+
+local function ResetALL()
+	
+	for _, index in pairs(menu.ScrollingFrame:GetChildren()) do
+		
+		pcall(function()
+			ScriptEditorService:DeregisterAutocompleteCallback(index.Text)
+		end)
+		OffsetY = 0
+		index:Destroy()
+		
+	end
+	
+	table.clear(DataStoreSave)
+	plugin:SetSetting("SaveCompletation", DataStoreSave)
+	
+end
+
+-------------STARTUP---------------
+
+interface.Enabled = false
+
+menu.Parent = interface
+
+if plugin:GetSetting("SaveCompletation") ~= nil then
+for _, index in plugin:GetSetting("SaveCompletation") do
+	
+	local CloneText = menu.CompleationText:Clone()
+	CloneText.Parent = menu.ScrollingFrame
+	CloneText.Text = index
+	CloneText.Visible = true
+	CloneText.Position += UDim2.fromOffset(0, OffsetY)
+	OffsetY += 50
+	CreateCompletation(CloneText.Text)
+	table.insert(DataStoreSave, CloneText.Text)
+	
+	CloneText.RemoveButton.MouseButton1Click:Connect(function()
+		
+		CloneText:Destroy()
+		DataStoreSave[CloneText.Text] = nil
+		OffsetY -= 50
+		pcall(function()
+			ScriptEditorService:DeregisterAutocompleteCallback(CloneText.Text)
+		end)
+		plugin:SetSetting("SaveCompletation", DataStoreSave)
+		
+	end)
+	
+end
+end
+
+local toolbar = plugin:CreateToolbar("More Auto-completaion")
+local toolButton = toolbar:CreateButton("More Auto-completaion", "Add your own Auto-completaion Easily", "rbxassetid://16968752135")
+
+------------TRIGGERS---------------
+toolButton.Click:Connect(toolActivated)
+menu.addButton.MouseButton1Click:Connect(function() CreateCompletation(menu.TitleAuto.Text) end)
+menu.ResetButton.MouseButton1Click:Connect(function() ResetALL() end)
